@@ -70,7 +70,7 @@ export default function IguanazoHome() {
             lineHeight: 36,
           }}
         >
-          Mi Iguana
+          Mi iguana
         </Text>
         <Text style={{ fontSize: 15, color: theme.textSecondary, marginTop: 4 }}>
           Tu espacio personal en Laiguana
@@ -130,7 +130,7 @@ function Secciones() {
       <Text style={{ color: theme.textSecondary, fontSize: 14, marginBottom: 16 }}>
         {editing
           ? `Tocá las secciones para recibir notificaciones · ${selectedCount} seleccionada${selectedCount === 1 ? '' : 's'}`
-          : 'Explorá todas las secciones de Laiguana'}
+          : 'Explorar todas las secciones de Laiguana'}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
         {SECTIONS.map((s) => {

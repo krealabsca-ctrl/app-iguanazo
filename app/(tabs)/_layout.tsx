@@ -24,7 +24,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="live" options={{ title: 'En Vivo' }} />
       <Tabs.Screen name="index" options={{ title: 'Noticias' }} />
       <Tabs.Screen name="podcasts" options={{ title: 'Podcasts' }} />
-      <Tabs.Screen name="iguanazo" options={{ title: 'Mi Iguana' }} />
+      <Tabs.Screen name="iguanazo" options={{ title: 'Mi iguana' }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
     </Tabs>
   );
@@ -39,7 +39,7 @@ function CustomTabBar({ state, navigation }: any) {
     { name: 'live', label: 'En Vivo', Icon: Radio, route: 'live' },
     { name: 'index', label: 'Noticias', Icon: Newspaper, route: 'index' },
     { name: 'podcasts', label: 'Podcasts', Icon: Mic, route: 'podcasts' },
-    { name: 'iguanazo', label: 'Mi Iguana', Icon: Bookmark, route: 'iguanazo' },
+    { name: 'iguanazo', label: 'Mi iguana', Icon: Bookmark, route: 'iguanazo' },
     { name: 'menu', label: 'Menú', Icon: null, route: null },
   ];
 

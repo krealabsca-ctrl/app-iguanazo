@@ -203,6 +203,9 @@ export function EpisodePlayerModal() {
       style={[
         StyleSheet.absoluteFillObject,
         styles.fullPlayerLayer,
+        // Solo elevamos por encima de todo cuando está expandido; minimizado va
+        // fuera de pantalla y sin elevación para no tapar ni proyectar sombra.
+        { elevation: isExpanded ? 9999 : 0, zIndex: isExpanded ? 9999 : 0 },
         { transform: [{ translateY: slideY }] },
       ]}
     >
@@ -336,8 +339,10 @@ export function EpisodePlayerModal() {
 const styles = StyleSheet.create({
   fullPlayerLayer: {
     backgroundColor: '#121212',
-    zIndex: 50,
-    elevation: 50,
+    // zIndex/elevation muy altos para quedar por encima de las pantallas
+    // nativas (react-native-screens) en Android al expandir el reproductor.
+    zIndex: 9999,
+    elevation: 9999,
   },
   headerRow: {
     flexDirection: 'row',

@@ -165,6 +165,43 @@ function pickImage(post: WpPost): { url: string; caption?: string } {
   return { url, caption: media?.caption?.rendered ? stripHtml(media.caption.rendered) : undefined };
 }
 
+/**
+ * Extrae los permalinks de posts de Instagram embebidos en el HTML crudo del
+ * artículo (antes de hacer strip). Reconoce el atributo data-instgrm-permalink
+ * de los blockquote.instagram-media y, como respaldo, URLs sueltas de IG.
+ * Devuelve permalinks canónicos normalizados (terminados en "/"), deduplicados.
+ */
+function extractInstagramEmbeds(html: string): string[] {
+  if (!html) return [];
+  const found = new Set<string>();
+  const add = (code: string, kind: string) => {
+    found.add(`https://www.instagram.com/${kind}/${code}/`);
+  };
+  const re = /instagram\.com\/(p|reel|tv|reels)\/([A-Za-z0-9_-]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const kind = m[1].toLowerCase() === 'reels' ? 'reel' : m[1].toLowerCase();
+    add(m[2], kind);
+  }
+  return Array.from(found);
+}
+
+/**
+ * Quita del HTML los blockquote de Instagram y Twitter (y sus scripts) antes de
+ * convertir a texto plano. Así el cuerpo no arrastra los residuos ("Ver esta
+ * publicación en Instagram", el texto del tweet, "pic.twitter.com/…", ni los
+ * saltos de línea enormes); cada embed se renderiza aparte con su propia tarjeta.
+ */
+function stripEmbeds(html: string): string {
+  if (!html) return html;
+  return html
+    .replace(/<blockquote[^>]*class="[^"]*instagram-media[^"]*"[\s\S]*?<\/blockquote>/gi, '')
+    .replace(/<blockquote[^>]*class="[^"]*twitter-tweet[^"]*"[\s\S]*?<\/blockquote>/gi, '')
+    .replace(/<script[^>]*(?:instagram\.com\/embed\.js|platform\.twitter\.com\/widgets\.js)[^>]*>\s*<\/script>/gi, '')
+    // pic.twitter.com/xxx sueltos (no tienen http:// así que no los toma el limpiador de URLs)
+    .replace(/pic\.twitter\.com\/\w+/gi, '');
+}
+
 function readingTime(text: string): number {
   const words = text.split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 220));
@@ -173,7 +210,8 @@ function readingTime(text: string): number {
 function mapPost(post: WpPost): Article {
   const title = stripHtml(post.title.rendered);
   const excerpt = stripHtml(post.excerpt.rendered).replace(/\[…\]$/u, '').trim();
-  const body = stripHtml(post.content.rendered);
+  const rawContent = post.content.rendered;
+  const body = stripHtml(stripEmbeds(rawContent));
   const image = pickImage(post);
   return {
     id: String(post.id),
@@ -193,6 +231,7 @@ function mapPost(post: WpPost): Article {
     isExclusive: false,
     relatedArticleIds: [],
     url: post.link,
+    instagramEmbeds: extractInstagramEmbeds(rawContent),
   };
 }
 

@@ -8,12 +8,15 @@ import { useNotificationStore } from '@/store/useNotificationStore';
 interface Props {
   showBack?: boolean;
   title?: string;
+  /** Acción al tocar el logo. Por defecto navega al inicio (Noticias). */
+  onLogoPress?: () => void;
 }
 
-export function MainHeader({ showBack, title }: Props) {
+export function MainHeader({ showBack, title, onLogoPress }: Props) {
   const router = useRouter();
   const theme = useTheme();
   const unread = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
+  const handleLogoPress = onLogoPress ?? (() => router.push('/'));
 
   return (
     <View
@@ -36,11 +39,19 @@ export function MainHeader({ showBack, title }: Props) {
             {title}
           </Text>
         ) : (
-          <Image
-            source={require('../../../assets/images/header.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <Pressable
+            onPress={handleLogoPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Ir al inicio y recargar noticias"
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Image
+              source={require('../../../assets/images/header.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Pressable>
         )}
       </View>
 
@@ -72,7 +83,7 @@ const styles = StyleSheet.create({
   },
   left: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 8, overflow: 'hidden' },
   right: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  logo: { height: 106, width: 230, marginLeft: -20},
+  logo: { height: 126, width: 250, marginLeft: -20},
   title: { fontSize: 17, fontWeight: '700' },
   dot: {
     position: 'absolute',

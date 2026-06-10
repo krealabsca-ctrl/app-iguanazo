@@ -41,6 +41,23 @@ function getPodcastPriority(title: string): number {
   return PODCAST_ORDER.length;
 }
 
+// Programas destacados que van de primero y SIN línea divisora entre ellos.
+// El orden de este arreglo define el orden en que se muestran.
+const FEATURED_PODCASTS: RegExp[] = [
+  /tienes\s*que\s*verlo/i,
+  /mapa\s*de\s*conflicto/i,
+  /chamo.*pelo\s*azul/i,
+  /lo\s*\+?\s*reciente|lo\s*m[aá]s\s*reciente/i,
+];
+
+// Índice dentro de los destacados, o -1 si no es destacado.
+function getFeaturedIndex(title: string): number {
+  for (let i = 0; i < FEATURED_PODCASTS.length; i++) {
+    if (FEATURED_PODCASTS[i].test(title)) return i;
+  }
+  return -1;
+}
+
 export default function PodcastsLibrary() {
   const theme = useTheme();
   const router = useRouter();
@@ -68,8 +85,20 @@ export default function PodcastsLibrary() {
 
   const orderedPlaylists = React.useMemo(() => {
     return [...playlists]
-      .map((p, idx) => ({ p, priority: getPodcastPriority(p.title || ''), idx }))
+      .map((p, idx) => ({
+        p,
+        featured: getFeaturedIndex(p.title || ''),
+        priority: getPodcastPriority(p.title || ''),
+        idx,
+      }))
       .sort((a, b) => {
+        const aFeat = a.featured >= 0;
+        const bFeat = b.featured >= 0;
+        // Destacados primero, en el orden definido en FEATURED_PODCASTS.
+        if (aFeat && bFeat) return a.featured - b.featured;
+        if (aFeat) return -1;
+        if (bFeat) return 1;
+        // El resto por la prioridad manual y luego el orden original.
         if (a.priority !== b.priority) return a.priority - b.priority;
         return a.idx - b.idx;
       })
@@ -142,13 +171,19 @@ export default function PodcastsLibrary() {
 
         {orderedPlaylists.length > 0 && (
           <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
-            {orderedPlaylists.map((p) => (
+            {orderedPlaylists.map((p) => {
+              const isFeatured = getFeaturedIndex(p.title || '') >= 0;
+              return (
               <Pressable
                 key={p.id}
                 onPress={() => router.push(`/programs/${p.id}`)}
                 style={({ pressed }) => [
                   styles.programRow,
-                  { borderBottomColor: theme.borderDefault, opacity: pressed ? 0.7 : 1 },
+                  {
+                    borderBottomColor: theme.borderDefault,
+                    borderBottomWidth: isFeatured ? 0 : 1,
+                    opacity: pressed ? 0.7 : 1,
+                  },
                 ]}
               >
                 <ImageFallback source={p.thumbnailUrl} style={styles.programThumb} />
@@ -167,7 +202,8 @@ export default function PodcastsLibrary() {
                 </View>
                 <ChevronRight size={20} color={`${theme.textTertiary}80`} />
               </Pressable>
-            ))}
+              );
+            })}
           </View>
         )}
 

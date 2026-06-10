@@ -35,6 +35,8 @@ export interface Article {
   isExclusive: boolean;
   relatedArticleIds: string[];
   url: string;
+  /** Permalinks de posts de Instagram embebidos en el cuerpo (para render). */
+  instagramEmbeds?: string[];
 }
 
 export interface Program {

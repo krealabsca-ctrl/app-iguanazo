@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Linking,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -31,6 +32,7 @@ import { useTheme, radius } from '@/theme/tokens';
 import { useArticlesStore } from '@/store/useArticlesStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useIguanazoStore } from '@/store/useIguanazoStore';
+import { useIguanazosStore } from '@/store/useIguanazosStore';
 import { usePulsoStore } from '@/store/usePulsoStore';
 import {
   YoutubeIcon,
@@ -48,7 +50,6 @@ const FEED_CATEGORIES = [
   'Para Ti',
   'En Vivo',
   'Política',
-  'Análisis',
   'Economía',
   'Internacional',
   'Sucesos',
@@ -59,7 +60,19 @@ const FEED_CATEGORIES = [
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CAROUSEL_HORIZONTAL_PADDING = 16;
+const CAROUSEL_GAP = 12;
 const CAROUSEL_CARD_WIDTH = SCREEN_WIDTH - CAROUSEL_HORIZONTAL_PADDING * 2;
+const CAROUSEL_SNAP = CAROUSEL_CARD_WIDTH + CAROUSEL_GAP;
+
+// Post fijado como principal de "El Iguanazo" (Diablos Danzantes de Yare 2026).
+const IGUANAZO_PINNED_ID = '1536718';
+const IGUANAZO_PINNED_TITLE = /diablos\s+danzantes\s+de\s+yare/i;
+
+// Carrusel coverflow del Iguanazo.
+const IG_CARD_W = Math.round(SCREEN_WIDTH * 0.74);
+const IG_CARD_SPACING = 4;
+const IG_ITEM_SIZE = IG_CARD_W + IG_CARD_SPACING;
+const IG_SIDE_PAD = (SCREEN_WIDTH - IG_ITEM_SIZE) / 2;
 
 export default function HomeFeed() {
   const theme = useTheme();
@@ -84,6 +97,9 @@ export default function HomeFeed() {
   const articlesError = useArticlesStore((s) => s.error);
   const loadArticles = useArticlesStore((s) => s.load);
   const refreshArticles = useArticlesStore((s) => s.refresh);
+  const loadMoreArticles = useArticlesStore((s) => s.loadMore);
+  const hasMore = useArticlesStore((s) => s.hasMore);
+  const loadingMore = useArticlesStore((s) => s.loadingMore);
 
   useEffect(() => {
     checkShouldShowBar();
@@ -97,8 +113,6 @@ export default function HomeFeed() {
     if (selectedCat === 'Para Ti') return articles;
     const matchMap: Record<string, (a: any) => boolean> = {
       Política: (a) => a.category?.name === 'Política y Geopolítica',
-      Análisis: (a) =>
-        a.category?.name === 'Análisis y Opinión' || a.tags?.includes('análisis'),
       Economía: (a) =>
         a.category?.name === 'Economía e Internacional' ||
         a.tags?.includes('dólar') ||
@@ -136,15 +150,23 @@ export default function HomeFeed() {
     setCarouselIndex(0);
   };
 
+  const scrollRef = useRef<ScrollView>(null);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await refreshArticles();
     setRefreshing(false);
   };
 
+  // Al tocar el logo: sube al inicio y recarga las noticias.
+  const onLogoPress = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    onRefresh();
+  };
+
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(offsetX / CAROUSEL_CARD_WIDTH);
+    const idx = Math.round(offsetX / CAROUSEL_SNAP);
     if (idx !== carouselIndex) setCarouselIndex(idx);
   };
 
@@ -162,7 +184,7 @@ export default function HomeFeed() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bgPrimary }}>
-      <MainHeader />
+      <MainHeader onLogoPress={onLogoPress} />
 
       <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.borderDefault }}>
         <ScrollView
@@ -237,6 +259,7 @@ export default function HomeFeed() {
       )}
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1, backgroundColor: theme.bgPrimary }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 200 }}
         refreshControl={
@@ -287,20 +310,20 @@ export default function HomeFeed() {
           <View style={{ marginBottom: 24 }}>
             <ScrollView
               horizontal
-              pagingEnabled
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={onCarouselScroll}
               decelerationRate="fast"
-              snapToInterval={CAROUSEL_CARD_WIDTH}
+              snapToInterval={CAROUSEL_SNAP}
               snapToAlignment="start"
               contentContainerStyle={{ paddingHorizontal: CAROUSEL_HORIZONTAL_PADDING }}
             >
-              {recent.map((item) => (
+              {recent.map((item, idx) => (
                 <Pressable
                   key={item.id}
                   onPress={() => router.push(`/article/${item.id}`)}
                   style={({ pressed }) => ({
                     width: CAROUSEL_CARD_WIDTH,
+                    marginRight: idx < recent.length - 1 ? CAROUSEL_GAP : 0,
                     opacity: pressed ? 0.9 : 1,
                   })}
                 >
@@ -309,19 +332,20 @@ export default function HomeFeed() {
                       source={item.imageUrl}
                       style={{ width: '100%', aspectRatio: 16 / 10 }}
                     />
-                    <View style={styles.carouselGradient} />
-                    <View style={styles.carouselContent}>
-                      {item.isBreaking && (
-                        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-                          <Badge variant="breaking" dot>
-                            Última Hora
-                          </Badge>
-                        </View>
-                      )}
-                      <Text style={styles.carouselTitle} numberOfLines={3}>
-                        {item.title}
-                      </Text>
-                    </View>
+                  </View>
+                  <View style={styles.carouselMeta}>
+                    <Text
+                      style={[
+                        styles.carouselCategory,
+                        { color: item.isBreaking ? theme.accentPrimary : theme.accentSecondary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.isBreaking ? 'ÚLTIMA HORA' : (item.category?.name || 'Noticias').toUpperCase()}
+                    </Text>
+                    <Text style={[styles.carouselTitle, { color: theme.textPrimary }]} numberOfLines={2}>
+                      {item.title}
+                    </Text>
                   </View>
                 </Pressable>
               ))}
@@ -432,13 +456,36 @@ export default function HomeFeed() {
               </Text>
             </View>
           )}
+
+          {others.length > 0 && hasMore && (
+            <Pressable
+              onPress={loadMoreArticles}
+              disabled={loadingMore}
+              style={({ pressed }) => [
+                styles.loadMoreBtn,
+                {
+                  borderColor: theme.borderDefault,
+                  backgroundColor: theme.bgSecondary,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              {loadingMore ? (
+                <ActivityIndicator color={theme.textSecondary} />
+              ) : (
+                <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 14 }}>
+                  Cargar noticias anteriores
+                </Text>
+              )}
+            </Pressable>
+          )}
         </View>
 
         {articles.length > 0 && (
           <>
             <MostReadSection articles={articles} />
             <LaFotoSection articles={articles} />
-            <IguanazoPromoSection articles={articles} />
+            <IguanazoPromoSection />
             <SiguenosSection />
           </>
         )}
@@ -495,7 +542,7 @@ function MostReadSection({ articles }: { articles: any[] }) {
             ]}
           >
             <Text style={[styles.mrListIndex, { color: theme.accentPrimary }]}>
-              {String(i + 1).padStart(2, '0')}
+              {String(i + 1).padStart(2, '')}
             </Text>
             <ImageFallback source={a.imageUrl} style={styles.mrListThumb} />
             <View style={{ flex: 1 }}>
@@ -559,18 +606,31 @@ function LaFotoSection({ articles }: { articles: any[] }) {
   );
 }
 
-function IguanazoPromoSection({ articles }: { articles: any[] }) {
+function IguanazoPromoSection() {
   const theme = useTheme();
   const router = useRouter();
-  // Banner principal: usamos el segundo artículo con imagen (para no duplicar
-  // con "La foto") como el contenido destacado del Iguanazo.
-  const featured = React.useMemo(() => {
-    const withImage = articles.filter((a) => !!a.imageUrl);
-    if (withImage.length >= 2) return withImage[1];
-    return withImage[0];
-  }, [articles]);
+  const items = useIguanazosStore((s) => s.items);
+  const load = useIguanazosStore((s) => s.load);
 
-  if (!featured) return null;
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Todos en un solo carrusel; "Diablos Danzantes de Yare 2026" va de primero
+  // (tarjeta central inicial) si está presente. Solo posts con imagen.
+  const ordered = React.useMemo(() => {
+    const withImages = items.filter((a) => !!a.imageUrl);
+    const i = withImages.findIndex(
+      (a) => a.id === IGUANAZO_PINNED_ID || IGUANAZO_PINNED_TITLE.test(a.title),
+    );
+    if (i > 0) {
+      const copy = [...withImages];
+      copy.unshift(copy.splice(i, 1)[0]);
+      return copy;
+    }
+    return withImages;
+  }, [items]);
+  if (ordered.length === 0) return null;
 
   return (
     <View style={styles.sectionWrap}>
@@ -579,28 +639,100 @@ function IguanazoPromoSection({ articles }: { articles: any[] }) {
         label="El Iguanazo"
         color={theme.accentSecondary}
       />
-      <Pressable
-        onPress={() => router.push(`/article/${featured.id}`)}
-        style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
-      >
-        <View style={styles.iguanazoBanner}>
-          <ImageFallback source={featured.imageUrl} style={StyleSheet.absoluteFill as any} />
-          <View style={styles.mrGradient} />
-          <View style={styles.iguanazoBannerContent}>
-            <View style={[styles.iguanazoTag, { backgroundColor: theme.accentSecondary }]}>
-              <Text style={styles.iguanazoTagText}>IGUANAZO</Text>
-            </View>
-            <Text numberOfLines={3} style={styles.iguanazoBannerTitle}>
-              {featured.title}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
+
+      <IguanazoCarousel
+        items={ordered.slice(0, 7)}
+        onPress={(id) => router.push(`/article/${id}`)}
+      />
     </View>
   );
 }
 
-const SOCIAL_ICONS: Record<SocialPlatform, React.ComponentType<{ size?: number }>> = {
+// Carrusel con efecto coverflow: la tarjeta central queda al frente y plana,
+// las laterales rotan en perspectiva, se encogen y se atenúan. Mantiene la
+// línea gráfica (imagen + degradado + título blanco + acento del Iguanazo).
+function IguanazoCarousel({
+  items,
+  onPress,
+}: {
+  items: any[];
+  onPress: (id: string) => void;
+}) {
+  const theme = useTheme();
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  return (
+    <Animated.ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={IG_ITEM_SIZE}
+      decelerationRate="fast"
+      scrollEventThrottle={16}
+      contentContainerStyle={{ paddingHorizontal: IG_SIDE_PAD, paddingVertical: 18 }}
+      onScroll={Animated.event(
+        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+        { useNativeDriver: true },
+      )}
+    >
+      {items.map((a, index) => {
+        const inputRange = [
+          (index - 1) * IG_ITEM_SIZE,
+          index * IG_ITEM_SIZE,
+          (index + 1) * IG_ITEM_SIZE,
+        ];
+        const scale = scrollX.interpolate({
+          inputRange,
+          outputRange: [0.84, 1, 0.84],
+          extrapolate: 'clamp',
+        });
+        const opacity = scrollX.interpolate({
+          inputRange,
+          outputRange: [0.45, 1, 0.45],
+          extrapolate: 'clamp',
+        });
+        const rotateY = scrollX.interpolate({
+          inputRange,
+          outputRange: ['32deg', '0deg', '-32deg'],
+          extrapolate: 'clamp',
+        });
+        const translateY = scrollX.interpolate({
+          inputRange,
+          outputRange: [22, 0, 22],
+          extrapolate: 'clamp',
+        });
+        return (
+          <View key={a.id} style={{ width: IG_ITEM_SIZE, alignItems: 'center' }}>
+            <Animated.View
+              style={{
+                width: IG_CARD_W,
+                opacity,
+                transform: [{ perspective: 1000 }, { rotateY }, { scale }, { translateY }],
+              }}
+            >
+              <Pressable
+                onPress={() => onPress(a.id)}
+                style={({ pressed }) => [styles.iguanazoCarouselCard, { opacity: pressed ? 0.9 : 1 }]}
+              >
+                <ImageFallback source={a.imageUrl} style={StyleSheet.absoluteFill as any} />
+                <View style={styles.iguanazoGridGradient} />
+                <View
+                  style={[styles.iguanazoCarouselTag, { backgroundColor: theme.accentSecondary }]}
+                >
+                  <Text style={styles.iguanazoTagText}>IGUANAZO</Text>
+                </View>
+                <Text numberOfLines={2} style={styles.iguanazoCarouselTitle}>
+                  {a.title}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+        );
+      })}
+    </Animated.ScrollView>
+  );
+}
+
+const SOCIAL_ICONS: Record<SocialPlatform, React.ComponentType<{ size?: number; color?: string }>> = {
   youtube: YoutubeIcon,
   x: XIcon,
   instagram: InstagramIcon,
@@ -652,7 +784,7 @@ function SiguenosSection() {
               accessibilityLabel={`Abrir ${s.platform}`}
             >
               <View style={styles.socialRowLeft}>
-                <Icon size={22} />
+                <Icon size={22} color={theme.textPrimary} />
                 <Text style={[styles.socialCount, { color: theme.textPrimary }]}>
                   {s.count}
                 </Text>
@@ -688,7 +820,7 @@ function SiguenosSection() {
               accessibilityRole="link"
               accessibilityLabel={`Abrir ${p}`}
             >
-              <Icon size={22} />
+              <Icon size={22} color={theme.textPrimary} />
             </Pressable>
           );
         })}
@@ -757,24 +889,19 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 16 },
   rowTitle: { fontSize: 15, fontWeight: '700', lineHeight: 19, fontFamily: 'OpenSans_700Bold' },
   rowFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  carouselGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '65%',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  carouselMeta: {
+    paddingTop: 10,
+    paddingHorizontal: 2,
   },
-  carouselContent: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
+  carouselCategory: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 5,
   },
   carouselTitle: {
-    color: '#fff',
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '700',
     fontFamily: 'OpenSans_700Bold',
   },
@@ -791,6 +918,14 @@ const styles = StyleSheet.create({
   sectionWrap: {
     paddingHorizontal: 16,
     marginTop: 32,
+  },
+  loadMoreBtn: {
+    marginTop: 20,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -842,7 +977,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '70%',
+    height: '40%',
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
 
@@ -859,39 +994,51 @@ const styles = StyleSheet.create({
     fontFamily: 'OpenSans_700Bold',
   },
 
-  /* Iguanazo banner */
-  iguanazoBanner: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: radius.card,
-    overflow: 'hidden',
-    backgroundColor: '#111',
-  },
-  iguanazoBannerContent: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 14,
-  },
-  iguanazoTag: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
+  /* Iguanazo */
   iguanazoTagText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.5,
   },
-  iguanazoBannerTitle: {
+  iguanazoGridGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '20%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  iguanazoCarouselCard: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+    backgroundColor: '#111',
+    justifyContent: 'flex-end',
+    // Sombra para dar profundidad al efecto coverflow.
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  iguanazoCarouselTag: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  iguanazoCarouselTitle: {
     color: '#fff',
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: '700',
     fontFamily: 'OpenSans_700Bold',
+    padding: 12,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,

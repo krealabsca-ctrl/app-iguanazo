@@ -119,7 +119,7 @@ export function MenuDrawer() {
               <Item icon={Bell} label="Notificaciones" theme={theme} onPress={() => go('/profile/notifications')} />
               <Item
                 icon={Bookmark}
-                label="Mi Iguana"
+                label="Mi iguana"
                 theme={theme}
                 onPress={() => go('/iguanazo')}
                 rightLabel={`${getIguanazoCount()} · ${followingCount}`}

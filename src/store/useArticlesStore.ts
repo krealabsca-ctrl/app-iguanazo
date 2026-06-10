@@ -19,13 +19,18 @@ interface ArticlesState {
   status: Status;
   error: string | null;
   lastFetchedAt: number | null;
+  page: number;
+  hasMore: boolean;
+  loadingMore: boolean;
   load: () => Promise<void>;
   setCategory: (id: number | null) => Promise<void>;
   refresh: () => Promise<void>;
+  loadMore: () => Promise<void>;
   getById: (id: string) => Article | undefined;
 }
 
 const STALE_MS = 5 * 60 * 1000;
+const PER_PAGE = 30;
 const cache: Record<string, CategoryCacheEntry> = {};
 
 function keyFor(id: number | null): string {
@@ -65,6 +70,9 @@ export const useArticlesStore = create<ArticlesState>()(
       error: null,
       lastFetchedAt: Date.now(),
       categoryId,
+      page: 1,
+      hasMore: articles.length >= PER_PAGE,
+      loadingMore: false,
     });
   };
 
@@ -78,7 +86,7 @@ export const useArticlesStore = create<ArticlesState>()(
     set({ status: 'loading', error: null, categoryId });
     try {
       const articles = await fetchArticles({
-        perPage: 30,
+        perPage: PER_PAGE,
         categories: categoryId ? [categoryId] : undefined,
       });
       cache[key] = { articles, fetchedAt: Date.now() };
@@ -97,6 +105,9 @@ export const useArticlesStore = create<ArticlesState>()(
     status: 'idle',
     error: null,
     lastFetchedAt: null,
+    page: 1,
+    hasMore: true,
+    loadingMore: false,
 
     load: async () => {
       const state = get();
@@ -114,6 +125,33 @@ export const useArticlesStore = create<ArticlesState>()(
 
     refresh: async () => {
       await fetchFor(get().categoryId, true);
+    },
+
+    loadMore: async () => {
+      const state = get();
+      if (state.loadingMore || !state.hasMore || state.status === 'loading') return;
+      const nextPage = state.page + 1;
+      set({ loadingMore: true });
+      try {
+        const more = await fetchArticles({
+          page: nextPage,
+          perPage: PER_PAGE,
+          categories: state.categoryId ? [state.categoryId] : undefined,
+        });
+        const existingIds = new Set(state.articles.map((a) => a.id));
+        const appended = more.filter((a) => !existingIds.has(a.id));
+        const articles = [...state.articles, ...appended];
+        set({
+          articles,
+          articlesAll: state.categoryId == null ? articles : state.articlesAll,
+          byId: trimById(mergeById(state.byId, more)),
+          page: nextPage,
+          hasMore: more.length >= PER_PAGE,
+          loadingMore: false,
+        });
+      } catch {
+        set({ loadingMore: false });
+      }
     },
 
     getById: (id) => get().byId[id] ?? get().articles.find((a) => a.id === id),

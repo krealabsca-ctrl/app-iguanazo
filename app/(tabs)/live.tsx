@@ -379,7 +379,7 @@ export default function LiveTV() {
           {completed.length > 0 && (
             <>
               <Text style={{ fontWeight: '700', fontSize: 18, color: theme.textPrimary, marginBottom: 16 }}>
-                Últimos programas emitidos
+                Últimos programas
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }}>
                 <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 16 }}>

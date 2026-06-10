@@ -96,18 +96,22 @@ export function cleanArticleBody(body: string): string {
     /^.*estar\s+informado.*$/i,
     /^.*el\s+portal\s+de\s+venezuela.*$/i,
     /^\s*(telegram|whatsapp|youtube|instagram|tiktok|facebook|threads|x)\b.*$/i,
+    // Restos del blockquote de Instagram tras quitar el HTML (inglés y español)
+    /^.*view\s+this\s+post\s+on\s+instagram.*$/i,
+    /^.*ver\s+esta\s+publicaci[oó]n\s+en\s+instagram.*$/i,
+    /^.*a\s+post\s+shared\s+by.*$/i,
+    /^.*una\s+publicaci[oó]n\s+compartida\s+(de|por).*$/i,
+    // Restos de tweets embebidos
+    /^pic\.twitter\.com\/\w+$/i,
   ];
 
   text = text
     .split('\n')
-    .filter((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return true; // keep blank lines for now
-      return !dropLinePatterns.some((re) => re.test(trimmed));
-    })
+    .map((line) => line.trim()) // normaliza líneas con solo espacios a vacías
+    .filter((line) => !dropLinePatterns.some((re) => re.test(line)))
     .join('\n');
 
-  // Collapse 3+ blank lines into 2
+  // Colapsa 2+ líneas en blanco consecutivas en una sola
   text = text.replace(/\n{3,}/g, '\n\n');
 
   return text.trim();

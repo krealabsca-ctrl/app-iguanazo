@@ -156,17 +156,17 @@ function RootShell() {
         <Stack.Screen name="profile/about" />
       </Stack>
 
-      {isAuthenticated && (
-        <>
-          <MiniPlayer />
-          <LiveMiniPlayer />
-          <TTSModal />
-          <EpisodePlayerModal />
-          <PulsoModal />
-        </>
-      )}
-      {!isAuthenticated && <LiveMiniPlayer />}
+      {/* Reproductores globales: disponibles también para invitados (sin sesión),
+          ya que la app permite navegar sin login.
+          El EpisodePlayerModal va de último para tener la mayor prioridad de
+          dibujo (clave en Android, donde las pantallas de react-native-screens
+          pueden tapar las capas superpuestas). */}
+      <MiniPlayer />
+      <LiveMiniPlayer />
       <MenuDrawer />
+      <TTSModal />
+      <PulsoModal />
+      <EpisodePlayerModal />
       <ListeningTracker />
 
       {splash && <SplashScreen onComplete={() => setSplash(false)} />}
