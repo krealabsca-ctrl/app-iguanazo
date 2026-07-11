@@ -14,6 +14,8 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import { WebView } from 'react-native-webview';
 import {
   Play,
   Pause,
@@ -33,6 +35,17 @@ import { useArticlesStore } from '@/store/useArticlesStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useIguanazoStore } from '@/store/useIguanazoStore';
 import { useIguanazosStore } from '@/store/useIguanazosStore';
+import { useLaFotoStore } from '@/store/useLaFotoStore';
+import { useDestacadosStore } from '@/store/useDestacadosStore';
+import { usePoliticaStore } from '@/store/usePoliticaStore';
+import { useDeportesStore } from '@/store/useDeportesStore';
+import { useFarandulaStore } from '@/store/useFarandulaStore';
+import { useGeneralStore } from '@/store/useGeneralStore';
+import { useEconomiaStore } from '@/store/useEconomiaStore';
+import { useSucesosStore } from '@/store/useSucesosStore';
+import { useYoutubeStore } from '@/store/useYoutubeStore';
+import { buildYoutubePlayerHTML } from '@/utils/youtubeVideo';
+import { getLiveEmbedUrl } from '@/utils/liveStream';
 import { usePulsoStore } from '@/store/usePulsoStore';
 import {
   YoutubeIcon,
@@ -70,7 +83,7 @@ const IGUANAZO_PINNED_TITLE = /diablos\s+danzantes\s+de\s+yare/i;
 
 // Carrusel coverflow del Iguanazo.
 const IG_CARD_W = Math.round(SCREEN_WIDTH * 0.74);
-const IG_CARD_SPACING = 4;
+const IG_CARD_SPACING = 14;
 const IG_ITEM_SIZE = IG_CARD_W + IG_CARD_SPACING;
 const IG_SIDE_PAD = (SCREEN_WIDTH - IG_ITEM_SIZE) / 2;
 
@@ -97,9 +110,20 @@ export default function HomeFeed() {
   const articlesError = useArticlesStore((s) => s.error);
   const loadArticles = useArticlesStore((s) => s.load);
   const refreshArticles = useArticlesStore((s) => s.refresh);
-  const loadMoreArticles = useArticlesStore((s) => s.loadMore);
-  const hasMore = useArticlesStore((s) => s.hasMore);
-  const loadingMore = useArticlesStore((s) => s.loadingMore);
+  const destacados = useDestacadosStore((s) => s.items);
+  const loadDestacados = useDestacadosStore((s) => s.load);
+  const politica = usePoliticaStore((s) => s.items);
+  const loadPolitica = usePoliticaStore((s) => s.load);
+  const deportes = useDeportesStore((s) => s.items);
+  const loadDeportes = useDeportesStore((s) => s.load);
+  const farandula = useFarandulaStore((s) => s.items);
+  const loadFarandula = useFarandulaStore((s) => s.load);
+  const general = useGeneralStore((s) => s.items);
+  const loadGeneral = useGeneralStore((s) => s.load);
+  const economia = useEconomiaStore((s) => s.items);
+  const loadEconomia = useEconomiaStore((s) => s.load);
+  const sucesos = useSucesosStore((s) => s.items);
+  const loadSucesos = useSucesosStore((s) => s.load);
 
   useEffect(() => {
     checkShouldShowBar();
@@ -107,7 +131,23 @@ export default function HomeFeed() {
 
   useEffect(() => {
     loadArticles();
-  }, [loadArticles]);
+    loadDestacados();
+    loadPolitica();
+    loadDeportes();
+    loadFarandula();
+    loadGeneral();
+    loadEconomia();
+    loadSucesos();
+  }, [
+    loadArticles,
+    loadDestacados,
+    loadPolitica,
+    loadDeportes,
+    loadFarandula,
+    loadGeneral,
+    loadEconomia,
+    loadSucesos,
+  ]);
 
   const filteredArticles = React.useMemo(() => {
     if (selectedCat === 'Para Ti') return articles;
@@ -132,14 +172,39 @@ export default function HomeFeed() {
     return fn ? articles.filter(fn) : articles;
   }, [articles, selectedCat]);
 
+  // Carrusel principal: noticias de la categoría "Destacados". Si aún no han
+  // cargado, se usan como respaldo las más recientes de la categoría activa.
   const recent = React.useMemo(() => {
-    return [...filteredArticles]
+    const source = destacados.length > 0 ? destacados : filteredArticles;
+    return [...source]
+      .filter((a) => !!a.imageUrl)
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, 3);
-  }, [filteredArticles]);
+      .slice(0, 6);
+  }, [destacados, filteredArticles]);
 
   const recentIds = React.useMemo(() => new Set(recent.map((a) => a.id)), [recent]);
-  const others = filteredArticles.filter((a) => !recentIds.has(a.id));
+
+  // Bloque debajo del slider, en este orden:
+  //   3 Política · 1 Deportes · 2 Política · 1 Farándula · 1 Política
+  // Si aún no han cargado, se usan como respaldo el resto de noticias de la
+  // categoría activa (sin las que ya están en el carrusel).
+  const others = React.useMemo(() => {
+    const byRecent = (a: any, b: any) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    if (politica.length > 0 || deportes.length > 0 || farandula.length > 0) {
+      const pol = [...politica].sort(byRecent);
+      const dep = [...deportes].sort(byRecent);
+      const far = [...farandula].sort(byRecent);
+      return [
+        ...pol.slice(0, 3), // 3 de Política
+        ...dep.slice(0, 1), // 1 de Deportes
+        ...pol.slice(3, 5), // 2 de Política
+        ...far.slice(0, 1), // 1 de Farándula
+        ...pol.slice(5, 6), // 1 de Política
+      ];
+    }
+    return filteredArticles.filter((a) => !recentIds.has(a.id)).slice(0, 8);
+  }, [politica, deportes, farandula, filteredArticles, recentIds]);
 
   const handleSelectCat = (cat: string) => {
     if (cat === 'En Vivo') {
@@ -154,7 +219,16 @@ export default function HomeFeed() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshArticles();
+    await Promise.all([
+      refreshArticles(),
+      loadDestacados(true),
+      loadPolitica(true),
+      loadDeportes(true),
+      loadFarandula(true),
+      loadGeneral(true),
+      loadEconomia(true),
+      loadSucesos(true),
+    ]);
     setRefreshing(false);
   };
 
@@ -334,15 +408,6 @@ export default function HomeFeed() {
                     />
                   </View>
                   <View style={styles.carouselMeta}>
-                    <Text
-                      style={[
-                        styles.carouselCategory,
-                        { color: item.isBreaking ? theme.accentPrimary : theme.accentSecondary },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.isBreaking ? 'ÚLTIMA HORA' : (item.category?.name || 'Noticias').toUpperCase()}
-                    </Text>
                     <Text style={[styles.carouselTitle, { color: theme.textPrimary }]} numberOfLines={2}>
                       {item.title}
                     </Text>
@@ -371,83 +436,41 @@ export default function HomeFeed() {
         )}
 
         <View style={{ paddingHorizontal: 16 }}>
-          {others.map((a, idx) => {
-            const isLive = a.tags?.some((t) => /vivo|directo|en curso/i.test(t)) ?? false;
-            return (
-              <View key={a.id}>
-                <Pressable
-                  onPress={() => router.push(`/article/${a.id}`)}
-                  style={({ pressed }) => [
-                    styles.row,
-                    {
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
-                >
-                  <ImageFallback
-                    source={a.imageUrl}
-                    style={{ width: 100, height: 100, borderRadius: radius.card }}
-                  />
-                  <View style={{ flex: 1, gap: 6 }}>
-                    {(a.isBreaking || isLive) && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                        {a.isBreaking && (
-                          <Badge variant="breaking" dot>
-                            Última Hora
-                          </Badge>
-                        )}
-                        {isLive && !a.isBreaking && (
-                          <Badge variant="live" dot>
-                            En Vivo
-                          </Badge>
-                        )}
-                      </View>
-                    )}
-                    <Text style={[styles.rowTitle, { color: theme.textPrimary }]} numberOfLines={3}>
-                      {a.title}
-                    </Text>
-                    <View style={styles.rowFooter}>
-                      <View style={{ flex: 1 }} />
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <IconButton
-                          size={34}
-                          active={isSaved(a.id)}
-                          onPress={() => (isSaved(a.id) ? unsave(a.id) : save(a.id))}
-                          activeColor={theme.accentSecondary}
-                        >
-                          <Bookmark
-                            size={15}
-                            color={isSaved(a.id) ? theme.accentSecondary : theme.textSecondary}
-                            fill={isSaved(a.id) ? theme.accentSecondary : 'transparent'}
-                          />
-                        </IconButton>
-                        <IconButton
-                          size={34}
-                          active={currentArticle?.id === a.id && isPlaying}
-                          onPress={() => togglePlay(a)}
-                          activeColor={theme.accentPrimary}
-                          activeBg
-                        >
-                          {currentArticle?.id === a.id && isPlaying ? (
-                            <Pause size={14} color="#fff" fill="#fff" />
-                          ) : (
-                            <Play
-                              size={14}
-                              color={theme.textSecondary}
-                              fill={theme.textSecondary}
-                            />
-                          )}
-                        </IconButton>
-                      </View>
-                    </View>
-                  </View>
-                </Pressable>
-                {idx < others.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: theme.borderDefault, marginVertical: 16 }} />
-                )}
-              </View>
-            );
-          })}
+          {others.map((a, idx) => (
+            <View key={a.id}>
+              <NewsRow article={a} />
+              {idx < others.length - 1 && (
+                <View style={{ height: 1, backgroundColor: theme.borderDefault, marginVertical: 16 }} />
+              )}
+              {/* Tras la última nota, el video del vivo. */}
+              {idx === others.length - 1 && <HomeLivePlayer />}
+            </View>
+          ))}
+
+          {/* Tras el live, 6 noticias de "General" omitiendo las 5 primeras. */}
+          {general.slice(5, 11).map((a, idx) => (
+            <View key={a.id}>
+              {idx > 0 && (
+                <View style={{ height: 1, backgroundColor: theme.borderDefault, marginVertical: 16 }} />
+              )}
+              <NewsRow article={a} />
+            </View>
+          ))}
+
+          {/* Bloque final: 1 Deportes (la 4) · 2 Economía (2–3) · 3 Sucesos
+              (desde la 0) · 1 Economía (la 4) · 1 Sucesos (la 3). */}
+          {[
+            ...deportes.slice(4, 5),
+            ...economia.slice(2, 4),
+            ...sucesos.slice(0, 3),
+            ...economia.slice(4, 5),
+            ...sucesos.slice(3, 4),
+          ].map((a) => (
+            <View key={a.id}>
+              <View style={{ height: 1, backgroundColor: theme.borderDefault, marginVertical: 16 }} />
+              <NewsRow article={a} />
+            </View>
+          ))}
 
           {!isInitialLoading && !hasError && articles.length === 0 && (
             <View style={{ paddingTop: 80, alignItems: 'center' }}>
@@ -456,35 +479,12 @@ export default function HomeFeed() {
               </Text>
             </View>
           )}
-
-          {others.length > 0 && hasMore && (
-            <Pressable
-              onPress={loadMoreArticles}
-              disabled={loadingMore}
-              style={({ pressed }) => [
-                styles.loadMoreBtn,
-                {
-                  borderColor: theme.borderDefault,
-                  backgroundColor: theme.bgSecondary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              {loadingMore ? (
-                <ActivityIndicator color={theme.textSecondary} />
-              ) : (
-                <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 14 }}>
-                  Cargar noticias anteriores
-                </Text>
-              )}
-            </Pressable>
-          )}
         </View>
 
         {articles.length > 0 && (
           <>
             <MostReadSection articles={articles} />
-            <LaFotoSection articles={articles} />
+            <LaFotoSection />
             <IguanazoPromoSection />
             <SiguenosSection />
           </>
@@ -565,16 +565,18 @@ function MostReadSection({ articles }: { articles: any[] }) {
   );
 }
 
-function LaFotoSection({ articles }: { articles: any[] }) {
+function LaFotoSection() {
   const theme = useTheme();
   const router = useRouter();
-  // Mejor candidato: el artículo más reciente con imagen y caption (si existe),
-  // o simplemente el más reciente con imagen.
-  const featured = React.useMemo(() => {
-    const withCaption = articles.find((a) => a.imageUrl && a.imageCaption);
-    if (withCaption) return withCaption;
-    return articles.find((a) => !!a.imageUrl);
-  }, [articles]);
+  const items = useLaFotoStore((s) => s.items);
+  const load = useLaFotoStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // La última publicación (con imagen) de la categoría "La foto".
+  const featured = React.useMemo(() => items.find((a) => !!a.imageUrl), [items]);
 
   if (!featured) return null;
   const caption = featured.imageCaption || featured.title;
@@ -602,6 +604,71 @@ function LaFotoSection({ articles }: { articles: any[] }) {
           </View>
         </View>
       </Pressable>
+    </View>
+  );
+}
+
+// Video del vivo embebido en el feed (tras la 6ª nota). Solo el video; al tocar
+// la etiqueta "EN VIVO" abre la pestaña En Vivo. Se gatea por foco para no
+// reproducir dos streams a la vez (home + pestaña En Vivo).
+function HomeLivePlayer() {
+  const router = useRouter();
+  const isFocused = useIsFocused();
+  const configured = useYoutubeStore((s) => s.configured);
+  const liveData = useYoutubeStore((s) => s.liveData);
+  const currentLive = useYoutubeStore((s) => s.currentLive);
+  const loadLive = useYoutubeStore((s) => s.loadLive);
+
+  useEffect(() => {
+    if (configured) loadLive();
+  }, [configured, loadLive]);
+
+  const liveVideoId = currentLive?.videoId || liveData?.live?.[0]?.id || null;
+  const html = React.useMemo(
+    () =>
+      liveVideoId ? buildYoutubePlayerHTML(liveVideoId, { controls: 1, mute: 1, autoplay: 1 }) : null,
+    [liveVideoId],
+  );
+
+  if (!configured) return null;
+
+  return (
+    <View style={{ marginTop: 24, marginBottom: 24 }}>
+      <View style={styles.homeLiveCard}>
+        {isFocused ? (
+          html ? (
+            <WebView
+              source={{ html, baseUrl: 'https://www.youtube-nocookie.com' }}
+              style={{ flex: 1, backgroundColor: '#000' }}
+              originWhitelist={['*']}
+              javaScriptEnabled
+              domStorageEnabled
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo
+              androidLayerType="hardware"
+              mixedContentMode="always"
+              setSupportMultipleWindows={false}
+            />
+          ) : (
+            <WebView
+              source={{ uri: getLiveEmbedUrl() }}
+              style={{ flex: 1, backgroundColor: '#000' }}
+              allowsFullscreenVideo
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled
+              domStorageEnabled
+              mixedContentMode="always"
+            />
+          )
+        ) : (
+          <View style={{ flex: 1, backgroundColor: '#000' }} />
+        )}
+        <Pressable onPress={() => router.push('/(tabs)/live')} style={styles.homeLiveBadge}>
+          <View style={styles.homeLiveDot} />
+          <Text style={styles.homeLiveBadgeText}>EN VIVO</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -829,6 +896,76 @@ function SiguenosSection() {
   );
 }
 
+// Fila de noticia estándar del feed (imagen + título + guardar/escuchar).
+function NewsRow({ article }: { article: any }) {
+  const theme = useTheme();
+  const router = useRouter();
+  const { togglePlay, currentArticle, isPlaying } = usePlayerStore();
+  const { isSaved, save, unsave } = useIguanazoStore();
+  const a = article;
+  const isLive = a.tags?.some((t: string) => /vivo|directo|en curso/i.test(t)) ?? false;
+  return (
+    <Pressable
+      onPress={() => router.push(`/article/${a.id}`)}
+      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.85 : 1 }]}
+    >
+      <ImageFallback
+        source={a.imageUrl}
+        style={{ width: 100, height: 100, borderRadius: radius.card }}
+      />
+      <View style={{ flex: 1, gap: 6 }}>
+        {(a.isBreaking || isLive) && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            {a.isBreaking && (
+              <Badge variant="breaking" dot>
+                Última Hora
+              </Badge>
+            )}
+            {isLive && !a.isBreaking && (
+              <Badge variant="live" dot>
+                En Vivo
+              </Badge>
+            )}
+          </View>
+        )}
+        <Text style={[styles.rowTitle, { color: theme.textPrimary }]} numberOfLines={3}>
+          {a.title}
+        </Text>
+        <View style={styles.rowFooter}>
+          <View style={{ flex: 1 }} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton
+              size={34}
+              active={isSaved(a.id)}
+              onPress={() => (isSaved(a.id) ? unsave(a.id) : save(a.id))}
+              activeColor={theme.accentSecondary}
+            >
+              <Bookmark
+                size={15}
+                color={isSaved(a.id) ? theme.accentSecondary : theme.textSecondary}
+                fill={isSaved(a.id) ? theme.accentSecondary : 'transparent'}
+              />
+            </IconButton>
+            <IconButton
+              size={34}
+              active={currentArticle?.id === a.id && isPlaying}
+              onPress={() => togglePlay(a)}
+              activeColor={theme.accentPrimary}
+              activeBg
+            >
+              {currentArticle?.id === a.id && isPlaying ? (
+                <Pause size={14} color="#fff" fill="#fff" />
+              ) : (
+                <Play size={14} color={theme.textSecondary} fill={theme.textSecondary} />
+              )}
+            </IconButton>
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function IconButton({
   children,
   active,
@@ -893,12 +1030,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: 2,
   },
-  carouselCategory: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 5,
-  },
   carouselTitle: {
     fontSize: 18,
     lineHeight: 23,
@@ -926,6 +1057,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  homeLiveCard: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  homeLiveBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  homeLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+  },
+  homeLiveBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1011,7 +1173,9 @@ const styles = StyleSheet.create({
   },
   iguanazoCarouselCard: {
     width: '100%',
-    aspectRatio: 1,
+    // Proporción de las imágenes del Iguanazo (~709x421 ≈ 5/3) para que se vean
+    // completas, sin el recorte fuerte que producía la tarjeta cuadrada.
+    aspectRatio: 5 / 3,
     borderRadius: radius.card,
     overflow: 'hidden',
     backgroundColor: '#111',

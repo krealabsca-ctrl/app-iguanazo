@@ -7,22 +7,22 @@ import { useTheme } from '@/theme/tokens';
 import { useMenuStore } from '@/store/useMenuStore';
 
 export const unstable_settings = {
-  initialRouteName: 'live',
+  initialRouteName: 'index',
 };
 
 export default function TabsLayout() {
   const theme = useTheme();
   return (
     <Tabs
-      initialRouteName="live"
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         tabBarStyle: { display: 'none' },
       }}
       tabBar={(props) => <CustomTabBar {...props} />}
     >
-      <Tabs.Screen name="live" options={{ title: 'En Vivo' }} />
       <Tabs.Screen name="index" options={{ title: 'Noticias' }} />
+      <Tabs.Screen name="live" options={{ title: 'En Vivo' }} />
       <Tabs.Screen name="podcasts" options={{ title: 'Podcasts' }} />
       <Tabs.Screen name="iguanazo" options={{ title: 'Mi iguana' }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
@@ -36,8 +36,8 @@ function CustomTabBar({ state, navigation }: any) {
   const { openMenu } = useMenuStore();
 
   const tabs = [
-    { name: 'live', label: 'En Vivo', Icon: Radio, route: 'live' },
     { name: 'index', label: 'Noticias', Icon: Newspaper, route: 'index' },
+    { name: 'live', label: 'En Vivo', Icon: Radio, route: 'live' },
     { name: 'podcasts', label: 'Podcasts', Icon: Mic, route: 'podcasts' },
     { name: 'iguanazo', label: 'Mi iguana', Icon: Bookmark, route: 'iguanazo' },
     { name: 'menu', label: 'Menú', Icon: null, route: null },

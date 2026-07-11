@@ -102,11 +102,11 @@ function RootShell() {
     if (!isAuthenticated && !inAuthGroup && loginRequired) {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)/live');
+      router.replace('/(tabs)');
     }
   }, [isAuthenticated, isHydrated, segments, splash, router]);
 
-  // Cold-start: siempre aterrizar en /(tabs)/live. Esto corre una sola vez
+  // Cold-start: aterrizar en la pestaña inicial (Noticias). Corre una sola vez
   // por sesión, así que no interfiere con la navegación posterior del usuario.
   useEffect(() => {
     if (!isHydrated || splash || landedOnLive) return;
@@ -118,7 +118,7 @@ function RootShell() {
       setLandedOnLive(true);
       return;
     }
-    router.replace('/(tabs)/live');
+    router.replace('/(tabs)');
     setLandedOnLive(true);
   }, [isHydrated, splash, landedOnLive, isAuthenticated, segments, router]);
 

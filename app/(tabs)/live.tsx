@@ -309,7 +309,7 @@ export default function LiveTV() {
             <Pressable
               onPress={() =>
                 Linking.openURL(
-                  'https://www.youtube.com/@laiguanatv?sub_confirmation=1',
+                  'https://www.youtube.com/@laiguanatv-television?sub_confirmation=1',
                 )
               }
               style={({ pressed }) => [

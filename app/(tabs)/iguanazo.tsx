@@ -24,25 +24,26 @@ type Section = {
   name: string;
   weeklyCount: number;
   imageUrl?: string;
+  imageLocal?: number;
   solidColor?: string;
 };
 
 const SECTIONS: Section[] = [
-  { id: 'politica', name: 'Política y Geopolítica', weeklyCount: 42, imageUrl: 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=600&q=80' },
-  { id: 'analisis', name: 'Análisis y Opinión', weeklyCount: 35, imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80' },
+  { id: 'politica', name: 'Política y Geopolítica', weeklyCount: 42, imageLocal: require('../../assets/images/sections/politica.jpeg') },
+  { id: 'analisis', name: 'Análisis y Opinión', weeklyCount: 35, imageLocal: require('../../assets/images/sections/analisis.jpeg') },
   { id: 'economia', name: 'Economía e Internacional', weeklyCount: 28, imageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80' },
   { id: 'internacional', name: 'Internacional', weeklyCount: 56, imageUrl: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=600&q=80' },
   { id: 'bonos', name: 'Bonos y Banca', weeklyCount: 12, imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80' },
-  { id: 'dolar', name: 'Dólar y Cambio', weeklyCount: 19, imageUrl: 'https://images.unsplash.com/photo-1633158829585-23ba8f7c8caf?w=600&q=80' },
-  { id: 'petroleo', name: 'Petróleo y Energía', weeklyCount: 24, solidColor: '#DC2626' },
+  { id: 'dolar', name: 'Dólar y Cambio', weeklyCount: 19, imageLocal: require('../../assets/images/sections/dolar.jpeg') },
+  { id: 'petroleo', name: 'Petróleo y Energía', weeklyCount: 24, imageLocal: require('../../assets/images/sections/petroleo.jpeg') },
   { id: 'esequibo', name: 'Esequibo', weeklyCount: 8, solidColor: '#c82022' },
-  { id: 'sucesos', name: 'Sucesos y Eventos', weeklyCount: 41, imageUrl: 'https://images.unsplash.com/photo-1583912267550-d6c2ac3196c0?w=600&q=80' },
-  { id: 'cultura', name: 'Cultura y Tecnología', weeklyCount: 15, imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80' },
+  { id: 'sucesos', name: 'Sucesos y Eventos', weeklyCount: 41, imageLocal: require('../../assets/images/sections/sucesos.jpeg') },
+  { id: 'cultura', name: 'Cultura y Tecnología', weeklyCount: 15, imageLocal: require('../../assets/images/sections/cultura.jpeg') },
   { id: 'deportes', name: 'Deportes y Salud', weeklyCount: 33, imageUrl: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&q=80' },
-  { id: 'virales', name: 'Virales y Farándula', weeklyCount: 62, imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80' },
-  { id: 'editoriales', name: 'Editoriales', weeklyCount: 7, imageUrl: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=600&q=80' },
+  { id: 'virales', name: 'Virales y Farándula', weeklyCount: 62, imageLocal: require('../../assets/images/sections/virales.jpeg') },
+  { id: 'editoriales', name: 'Editoriales', weeklyCount: 7, imageLocal: require('../../assets/images/sections/editoriales.jpeg') },
   { id: 'sociedad', name: 'Sociedad', weeklyCount: 21, imageUrl: 'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=600&q=80' },
-  { id: 'comunicacion', name: 'Comunicación e Información', weeklyCount: 11, imageUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&q=80' },
+  { id: 'comunicacion', name: 'Comunicación e Información', weeklyCount: 11, imageLocal: require('../../assets/images/sections/comunicacion.jpeg') },
 ];
 
 export default function IguanazoHome() {
@@ -151,8 +152,8 @@ function Secciones() {
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              {s.imageUrl && (
-                <ImageFallback source={s.imageUrl} style={StyleSheet.absoluteFill as any} />
+              {(s.imageLocal || s.imageUrl) && (
+                <ImageFallback source={s.imageLocal || s.imageUrl} style={StyleSheet.absoluteFill as any} />
               )}
               {/* Bottom-only darkening overlay (sim. gradient) */}
               <View

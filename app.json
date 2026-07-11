@@ -24,6 +24,7 @@
       }
     },
     "android": {
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon-android.png",
         "backgroundColor": "#ffffff"
@@ -72,6 +73,7 @@
     },
     "extra": {
       "router": {},
+      "buildNumber": 3,
       "eas": {
         "projectId": "1919d5fa-4d29-41bf-a305-771bb0f645c3"
       }

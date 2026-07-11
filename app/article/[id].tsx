@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
@@ -19,14 +19,19 @@ import {
   Headphones,
   Play,
   Pause,
+  Sun,
+  Coffee,
+  Moon,
+  X,
 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { ImageFallback } from '@/components/ui/ImageFallback';
-import { useTheme, radius } from '@/theme/tokens';
+import { useTheme, useThemeName, radius } from '@/theme/tokens';
 import { useArticlesStore } from '@/store/useArticlesStore';
 import { useIguanazosStore } from '@/store/useIguanazosStore';
+import { useLaFotoStore } from '@/store/useLaFotoStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useReadingListStore } from '@/store/useReadingListStore';
 import { useIguanazoStore } from '@/store/useIguanazoStore';
@@ -48,19 +53,74 @@ import {
   type SocialPlatform,
 } from '@/utils/socialLinks';
 
+type ReadingTheme = 'light' | 'coffee' | 'dark';
+
+// Paletas del modo lectura (solo se sobreescriben fondo, texto y bordes; los
+// acentos de marca se conservan).
+const READING_THEMES: Record<ReadingTheme, {
+  bgPrimary: string;
+  bgSecondary: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  borderDefault: string;
+}> = {
+  light: {
+    bgPrimary: '#FFFFFF',
+    bgSecondary: '#F4F4F5',
+    textPrimary: '#1A1A1A',
+    textSecondary: '#5A5A5A',
+    textTertiary: '#9A9A9A',
+    borderDefault: '#E5E5E5',
+  },
+  coffee: {
+    bgPrimary: '#F3EAD6',
+    bgSecondary: '#EADFC4',
+    textPrimary: '#3F3222',
+    textSecondary: '#6B5A41',
+    textTertiary: '#9A8763',
+    borderDefault: '#DDCDA8',
+  },
+  dark: {
+    bgPrimary: '#0A0A0A',
+    bgSecondary: '#171717',
+    textPrimary: '#EDEDED',
+    textSecondary: '#9A9A9A',
+    textTertiary: '#6B6B6B',
+    borderDefault: '#262626',
+  },
+};
+
+const FONT_MIN = 0.85;
+const FONT_MAX = 1.5;
+const FONT_STEP = 0.1;
+
 export default function ArticleDetail() {
   const theme = useTheme();
+  const themeName = useThemeName();
   const router = useRouter();
+
+  const [fontScale, setFontScale] = useState(1);
+  const [readingTheme, setReadingTheme] = useState<ReadingTheme>(
+    themeName === 'dark' ? 'dark' : 'light',
+  );
+  const [toolbarOpen, setToolbarOpen] = useState(true);
+  // Colores efectivos: tema de la app con el modo lectura sobrepuesto.
+  const rc = { ...theme, ...READING_THEMES[readingTheme] };
+  const decFont = () => setFontScale((f) => Math.max(FONT_MIN, +(f - FONT_STEP).toFixed(2)));
+  const incFont = () => setFontScale((f) => Math.min(FONT_MAX, +(f + FONT_STEP).toFixed(2)));
   const { id } = useLocalSearchParams<{ id: string }>();
   const articles = useArticlesStore((s) => s.articles);
   const articlesAll = useArticlesStore((s) => s.articlesAll);
   const byId = useArticlesStore((s) => s.byId);
   const iguanazos = useIguanazosStore((s) => s.items);
+  const laFoto = useLaFotoStore((s) => s.items);
   const article =
     (id ? byId[id] : undefined) ||
     articles.find((a) => a.id === id) ||
     articlesAll.find((a) => a.id === id) ||
     iguanazos.find((a) => a.id === id) ||
+    laFoto.find((a) => a.id === id) ||
     articles[0] ||
     articlesAll[0];
 
@@ -126,10 +186,10 @@ export default function ArticleDetail() {
   const toggleSave = () => (saved ? unsave(article.id) : save(article.id));
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bgPrimary }}>
-      <View style={[styles.header, { borderBottomColor: theme.borderDefault }]}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: rc.bgPrimary }}>
+      <View style={[styles.header, { borderBottomColor: rc.borderDefault }]}>
         <Pressable onPress={() => router.back()} style={{ padding: 6 }}>
-          <ArrowLeft size={24} color={theme.textPrimary} />
+          <ArrowLeft size={24} color={rc.textPrimary} />
         </Pressable>
         <View style={styles.headerLogoWrap} pointerEvents="none">
           <Image
@@ -142,12 +202,12 @@ export default function ArticleDetail() {
           <Pressable onPress={toggleSave} style={{ padding: 6 }}>
             <Bookmark
               size={24}
-              color={saved ? theme.accentSecondary : theme.textPrimary}
-              fill={saved ? theme.accentSecondary : 'transparent'}
+              color={saved ? rc.accentSecondary : rc.textPrimary}
+              fill={saved ? rc.accentSecondary : 'transparent'}
             />
           </Pressable>
           <Pressable onPress={handleShare} style={{ padding: 6 }}>
-            <Share size={24} color={theme.textPrimary} />
+            <Share size={24} color={rc.textPrimary} />
           </Pressable>
         </View>
       </View>
@@ -160,7 +220,7 @@ export default function ArticleDetail() {
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 borderRadius: 4,
-                backgroundColor: theme.bgSecondary,
+                backgroundColor: rc.bgSecondary,
               }}
             >
               <Text
@@ -177,10 +237,10 @@ export default function ArticleDetail() {
           </View>
           <Text
             style={{
-              fontSize: 28,
+              fontSize: 28 * fontScale,
               fontWeight: '600',
-              color: theme.textPrimary,
-              lineHeight: 34,
+              color: rc.textPrimary,
+              lineHeight: 34 * fontScale,
               marginBottom: 12,
               fontFamily: 'OpenSans_700Bold',
             }}
@@ -213,8 +273,8 @@ export default function ArticleDetail() {
                 <Headphones size={20} color="#fff" />
               </View>
               <View>
-                <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 15 }}>Escuchar artículo</Text>
-                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                <Text style={{ color: rc.textPrimary, fontWeight: '700', fontSize: 15 }}>Escuchar artículo</Text>
+                <Text style={{ color: rc.textSecondary, fontSize: 13 }}>
                   {article.readingTimeMinutes} min de audio
                 </Text>
               </View>
@@ -227,7 +287,9 @@ export default function ArticleDetail() {
             style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginVertical: 24 }}
           />
 
-          <Text style={{ color: theme.textPrimary, fontSize: 17, lineHeight: 28 }}>{cleanedBody}</Text>
+          <Text style={{ color: rc.textPrimary, fontSize: 17 * fontScale, lineHeight: 28 * fontScale }}>
+            {cleanedBody}
+          </Text>
 
           {!!article.instagramEmbeds?.length &&
             article.instagramEmbeds.map((permalink) => (
@@ -235,11 +297,11 @@ export default function ArticleDetail() {
             ))}
 
           {socials.length > 0 && (
-            <View style={{ marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: theme.borderDefault }}>
+            <View style={{ marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: rc.borderDefault }}>
               <Text
                 style={{
                   textAlign: 'center',
-                  color: theme.textTertiary,
+                  color: rc.textTertiary,
                   fontSize: 11,
                   fontWeight: '700',
                   letterSpacing: 2,
@@ -261,34 +323,35 @@ export default function ArticleDetail() {
                     key={s.platform}
                     platform={s.platform}
                     url={s.url}
-                    bg={theme.bgSecondary}
-                    border={theme.borderDefault}
+                    bg={rc.bgSecondary}
+                    border={rc.borderDefault}
+                    iconColor={rc.textPrimary}
                   />
                 ))}
               </View>
             </View>
           )}
 
-          <View style={{ marginTop: 40, paddingTop: 24, borderTopWidth: 1, borderTopColor: theme.borderDefault }}>
-            <Text style={{ textAlign: 'center', color: theme.textPrimary, fontWeight: '700', marginBottom: 20 }}>
+          <View style={{ marginTop: 40, paddingTop: 24, borderTopWidth: 1, borderTopColor: rc.borderDefault }}>
+            <Text style={{ textAlign: 'center', color: rc.textPrimary, fontWeight: '700', marginBottom: 20 }}>
               ¿Te pareció interesante? Compártelo
             </Text>
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
               <Pressable onPress={handleShare} style={{ alignItems: 'center', gap: 6 }}>
-                <View style={[styles.shareCircle, { backgroundColor: theme.bgSecondary, borderColor: theme.borderDefault }]}>
-                  <Share size={24} color={theme.textPrimary} />
+                <View style={[styles.shareCircle, { backgroundColor: rc.bgSecondary, borderColor: rc.borderDefault }]}>
+                  <Share size={24} color={rc.textPrimary} />
                 </View>
-                <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: '600' }}>COMPARTIR</Text>
+                <Text style={{ color: rc.textSecondary, fontSize: 11, fontWeight: '600' }}>COMPARTIR</Text>
               </Pressable>
               <Pressable onPress={toggleSave} style={{ alignItems: 'center', gap: 6 }}>
-                <View style={[styles.shareCircle, { backgroundColor: theme.bgSecondary, borderColor: theme.borderDefault }]}>
+                <View style={[styles.shareCircle, { backgroundColor: rc.bgSecondary, borderColor: rc.borderDefault }]}>
                   <Bookmark
                     size={24}
-                    color={saved ? theme.accentSecondary : theme.textPrimary}
-                    fill={saved ? theme.accentSecondary : 'transparent'}
+                    color={saved ? rc.accentSecondary : rc.textPrimary}
+                    fill={saved ? rc.accentSecondary : 'transparent'}
                   />
                 </View>
-                <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: '600' }}>
+                <Text style={{ color: rc.textSecondary, fontSize: 11, fontWeight: '600' }}>
                   {saved ? 'GUARDADO' : 'GUARDAR'}
                 </Text>
               </Pressable>
@@ -299,15 +362,15 @@ export default function ArticleDetail() {
         {related.length > 0 && (
           <View
             style={{
-              backgroundColor: theme.bgSecondary,
+              backgroundColor: rc.bgSecondary,
               padding: 20,
               borderTopWidth: 1,
-              borderTopColor: theme.borderDefault,
+              borderTopColor: rc.borderDefault,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <View style={{ width: 6, height: 24, backgroundColor: theme.accentPrimary, borderRadius: 3 }} />
-              <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontFamily: 'OpenSans_700Bold' }}>
+              <View style={{ width: 6, height: 24, backgroundColor: rc.accentPrimary, borderRadius: 3 }} />
+              <Text style={{ fontSize: 20, fontWeight: '700', color: rc.textPrimary, fontFamily: 'OpenSans_700Bold' }}>
                 Te puede interesar
               </Text>
             </View>
@@ -320,21 +383,21 @@ export default function ArticleDetail() {
                     {
                       flexDirection: 'row',
                       gap: 16,
-                      backgroundColor: theme.bgPrimary,
+                      backgroundColor: rc.bgPrimary,
                       borderRadius: radius.card,
                       padding: 12,
                       borderWidth: 1,
-                      borderColor: theme.borderDefault,
+                      borderColor: rc.borderDefault,
                       opacity: pressed ? 0.85 : 1,
                     },
                   ]}
                 >
                   <ImageFallback source={rel.imageUrl} style={{ width: 80, height: 80, borderRadius: 8 }} />
                   <View style={{ flex: 1, justifyContent: 'center' }}>
-                    <Text numberOfLines={2} style={{ fontWeight: '700', fontSize: 15, color: theme.textPrimary }}>
+                    <Text numberOfLines={2} style={{ fontWeight: '700', fontSize: 15, color: rc.textPrimary }}>
                       {rel.title}
                     </Text>
-                    <Text style={{ fontSize: 12, color: theme.textTertiary, marginTop: 4 }}>
+                    <Text style={{ fontSize: 12, color: rc.textTertiary, marginTop: 4 }}>
                       {format(new Date(rel.publishedAt), 'dd MMM yyyy', { locale: es })}
                     </Text>
                   </View>
@@ -344,7 +407,125 @@ export default function ArticleDetail() {
           </View>
         )}
       </ScrollView>
+
+      {/* Menú flotante de lectura */}
+      <ReadingToolbar
+        open={toolbarOpen}
+        rc={rc}
+        readingTheme={readingTheme}
+        fontScale={fontScale}
+        onDecFont={decFont}
+        onIncFont={incFont}
+        onSetTheme={setReadingTheme}
+        onListen={handleTTS}
+        onClose={() => setToolbarOpen(false)}
+        onOpen={() => setToolbarOpen(true)}
+      />
     </SafeAreaView>
+  );
+}
+
+function ReadingToolbar({
+  open,
+  rc,
+  readingTheme,
+  fontScale,
+  onDecFont,
+  onIncFont,
+  onSetTheme,
+  onListen,
+  onClose,
+  onOpen,
+}: {
+  open: boolean;
+  rc: { bgPrimary: string; bgSecondary: string; textPrimary: string; textSecondary: string; borderDefault: string; accentSecondary: string };
+  readingTheme: ReadingTheme;
+  fontScale: number;
+  onDecFont: () => void;
+  onIncFont: () => void;
+  onSetTheme: (t: ReadingTheme) => void;
+  onListen: () => void;
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const bottom = insets.bottom + 16;
+
+  // Botón compacto para reabrir el menú cuando está cerrado.
+  if (!open) {
+    return (
+      <Pressable
+        onPress={onOpen}
+        accessibilityLabel="Opciones de lectura"
+        style={({ pressed }) => [
+          styles.toolbarReopen,
+          { bottom, backgroundColor: rc.bgSecondary, borderColor: rc.borderDefault, opacity: pressed ? 0.8 : 1 },
+        ]}
+      >
+        <Text style={{ color: rc.textPrimary, fontWeight: '800', fontSize: 16 }}>Aa</Text>
+      </Pressable>
+    );
+  }
+
+  const Sep = () => <View style={[styles.toolbarSep, { backgroundColor: rc.borderDefault }]} />;
+  const themes: { key: ReadingTheme; Icon: typeof Sun }[] = [
+    { key: 'light', Icon: Sun },
+    { key: 'coffee', Icon: Coffee },
+    { key: 'dark', Icon: Moon },
+  ];
+
+  return (
+    <View style={[styles.toolbar, { bottom, backgroundColor: rc.bgSecondary, borderColor: rc.borderDefault }]}>
+      <Pressable
+        onPress={onDecFont}
+        disabled={fontScale <= FONT_MIN}
+        accessibilityLabel="Reducir tamaño de texto"
+        style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed || fontScale <= FONT_MIN ? 0.4 : 1 }]}
+      >
+        <Text style={{ color: rc.textPrimary, fontSize: 14, fontWeight: '700' }}>T</Text>
+      </Pressable>
+      <Pressable
+        onPress={onIncFont}
+        disabled={fontScale >= FONT_MAX}
+        accessibilityLabel="Aumentar tamaño de texto"
+        style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed || fontScale >= FONT_MAX ? 0.4 : 1 }]}
+      >
+        <Text style={{ color: rc.textPrimary, fontSize: 22, fontWeight: '700' }}>T</Text>
+      </Pressable>
+
+      <Sep />
+
+      {themes.map(({ key, Icon }) => {
+        const active = readingTheme === key;
+        return (
+          <Pressable
+            key={key}
+            onPress={() => onSetTheme(key)}
+            accessibilityLabel={`Fondo ${key}`}
+            style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Icon size={22} color={active ? rc.accentSecondary : rc.textSecondary} />
+          </Pressable>
+        );
+      })}
+
+      <Sep />
+
+      <Pressable
+        onPress={onListen}
+        accessibilityLabel="Escuchar nota"
+        style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.6 : 1 }]}
+      >
+        <Headphones size={22} color={rc.textPrimary} />
+      </Pressable>
+      <Pressable
+        onPress={onClose}
+        accessibilityLabel="Cerrar menú"
+        style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.6 : 1 }]}
+      >
+        <X size={22} color={rc.textSecondary} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -353,11 +534,13 @@ function SocialButton({
   url,
   bg,
   border,
+  iconColor,
 }: {
   platform: SocialPlatform;
   url: string;
   bg: string;
   border: string;
+  iconColor?: string;
 }) {
   const theme = useTheme();
   const Icon = SOCIAL_ICONS[platform];
@@ -377,7 +560,7 @@ function SocialButton({
       accessibilityRole="link"
       accessibilityLabel={label}
     >
-      <Icon size={22} color={theme.textPrimary} />
+      <Icon size={22} color={iconColor ?? theme.textPrimary} />
     </Pressable>
   );
 }
@@ -576,7 +759,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerLogo: { width: 120, height: 34 },
+  headerLogo: { width: 150, height: 44 },
+  toolbar: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  toolbarBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolbarSep: {
+    width: 1,
+    height: 22,
+    marginHorizontal: 4,
+  },
+  toolbarReopen: {
+    position: 'absolute',
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
   igCard: {
     marginTop: 20,
     borderRadius: 16,

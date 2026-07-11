@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import {
   User,
@@ -33,6 +34,12 @@ import { useHistoryStore } from '@/store/useHistoryStore';
 import { usePulsoStore } from '@/store/usePulsoStore';
 import { useUserStore } from '@/store/useUserStore';
 import { Toggle } from '@/components/ui/Toggle';
+import { KreaLabLogo } from '@/components/ui/KreaLabLogo';
+
+// Versión de la app + contador de build (se incrementa en cada APK generado,
+// ver scripts/bump-build.cjs). Se muestra al final del menú: "v1.0.0 (N)".
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+const BUILD_NUMBER = Number((Constants.expoConfig?.extra as { buildNumber?: number })?.buildNumber ?? 0);
 
 export function MenuDrawer() {
   const theme = useTheme();
@@ -185,7 +192,7 @@ export function MenuDrawer() {
                 icon={PlayCircle}
                 label="Canal de YouTube"
                 theme={theme}
-                onPress={() => Linking.openURL('https://youtube.com/laiguanatv')}
+                onPress={() => Linking.openURL('https://www.youtube.com/@laiguanatv-television')}
               />
 
               <SectionTitle title="Ayuda y Legal" theme={theme} />
@@ -199,10 +206,23 @@ export function MenuDrawer() {
               <Item icon={FileText} label="Términos y Privacidad" theme={theme} onPress={() => {}} />
 
               <View style={{ padding: 16, alignItems: 'center', opacity: 0.6 }}>
-                <Text style={{ fontSize: 12, color: theme.textSecondary }}>Laiguana App v1.0.0</Text>
-                <Text style={{ fontSize: 12, color: theme.textTertiary, marginTop: 4 }}>
-                  Hecho con 🦎 desde Venezuela
+                <Text style={{ fontSize: 12, color: theme.textSecondary }}>
+                  Laiguana App v{APP_VERSION} ({BUILD_NUMBER})
                 </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
+                    gap: 5,
+                    marginTop: 4,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: theme.textTertiary }}>Hecho con</Text>
+                  <KreaLabLogo height={15} />
+                  <Text style={{ fontSize: 12, color: theme.textTertiary }}>desde Venezuela</Text>
+                </View>
               </View>
             </ScrollView>
           </SafeAreaView>

@@ -5,7 +5,7 @@ import { ImageOff } from 'lucide-react-native';
 import { useTheme } from '@/theme/tokens';
 
 interface Props {
-  source?: string | null;
+  source?: string | number | null;
   style?: StyleProp<ImageStyle>;
   contentFit?: ImageContentFit;
   transition?: number;
@@ -33,7 +33,7 @@ export function ImageFallback({
 
   return (
     <Image
-      source={{ uri: source }}
+      source={typeof source === 'number' ? source : { uri: source }}
       style={style}
       contentFit={contentFit}
       transition={transition}

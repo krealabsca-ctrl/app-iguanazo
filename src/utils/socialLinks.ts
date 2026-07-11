@@ -1,7 +1,7 @@
 // Defaults for La Iguana's official accounts. Used when the body mentions
 // a platform by name without including a URL.
 export const LAIGUANA_SOCIAL: Record<SocialPlatform, string> = {
-  youtube: 'https://www.youtube.com/@laiguanatv',
+  youtube: 'https://www.youtube.com/@laiguanatv-television',
   x: 'https://x.com/laiguanatv',
   instagram: 'https://www.instagram.com/laiguanatv',
   tiktok: 'https://www.tiktok.com/@laiguanatv',

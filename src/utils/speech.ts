@@ -1,4 +1,14 @@
 import * as Speech from 'expo-speech';
+import { setAudioModeAsync } from 'expo-audio';
+
+// Re-asegura una sesión de audio apta para reproducir voz. Otros reproductores
+// (live/podcast en WebView) pueden dejar la sesión en un estado que silencia el
+// TTS, así que la fijamos justo antes de hablar.
+async function ensurePlaybackAudio() {
+  try {
+    await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'duckOthers' });
+  } catch {}
+}
 
 let cachedVoice: string | undefined;
 let cachedLang: string | undefined;
@@ -55,8 +65,9 @@ export function preloadFriendlyVoice(): Promise<string | undefined> {
 
 export function friendlyOptions(rate = 1): Speech.SpeechOptions {
   return {
-    // Usa el idioma de la voz elegida; si no hay, intenta acento venezolano.
-    language: cachedLang || 'es-VE',
+    // Usa el idioma de la voz elegida; si no hay, español genérico (más
+    // compatible entre equipos que un acento específico como es-VE).
+    language: cachedLang || 'es',
     rate: 0.92 * rate, // un pelín más lento = más nítido y natural
     pitch: 1.0, // tono neutro (1.08 sonaba más artificial)
     voice: cachedVoice,
@@ -108,10 +119,12 @@ export class SpeechQueue {
     this.onComplete = opts.onComplete;
     this.onError = opts.onError;
     this.active = true;
-    void preloadFriendlyVoice().finally(() => this.speakCurrent());
+    void ensurePlaybackAudio().finally(() =>
+      preloadFriendlyVoice().finally(() => this.speakCurrent()),
+    );
   }
 
-  private speakCurrent() {
+  private speakCurrent(retryNoVoice = false) {
     if (!this.active) return;
     if (this.index >= this.chunks.length) {
       this.active = false;
@@ -120,8 +133,12 @@ export class SpeechQueue {
     }
     const chunk = this.chunks[this.index];
     this.onProgress?.(chunk, this.index);
+    const opts = friendlyOptions(this.rate);
+    // Si una voz específica falla, reintentamos sin voz (voz por defecto del
+    // sistema), que es lo que evita que el TTS quede mudo en algunos equipos.
+    if (retryNoVoice) opts.voice = undefined;
     Speech.speak(chunk.text, {
-      ...friendlyOptions(this.rate),
+      ...opts,
       onDone: () => {
         if (!this.active) return;
         this.index += 1;
@@ -130,6 +147,11 @@ export class SpeechQueue {
       onStopped: () => {},
       onError: (err) => {
         if (!this.active) return;
+        if (!retryNoVoice && opts.voice) {
+          // Reintenta el MISMO fragmento sin la voz específica.
+          this.speakCurrent(true);
+          return;
+        }
         this.onError?.(err);
         this.index += 1;
         this.speakCurrent();
